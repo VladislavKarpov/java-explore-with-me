@@ -35,7 +35,6 @@ public class EventService {
     private final RequestRepository requestRepository;
     private final StatsService statsService;
 
-
     @Transactional
     public EventDto.EventFullDto createEvent(Long userId, EventDto.NewEventDto dto) {
         User user = userService.getEntityById(userId);
@@ -104,7 +103,6 @@ public class EventService {
         return enrichFullDto(eventRepository.save(event));
     }
 
-
     public List<EventDto.EventFullDto> getEventsByAdmin(List<Long> users, List<String> states, List<Long> categories,
                                                         String rangeStart, String rangeEnd, int from, int size) {
         List<EventState> stateList = states != null
@@ -147,7 +145,6 @@ public class EventService {
 
         return enrichFullDto(eventRepository.save(event));
     }
-
 
     public List<EventDto.EventShortDto> getPublicEvents(String text, List<Long> categories, Boolean paid,
                                                         String rangeStart, String rangeEnd,
@@ -195,9 +192,13 @@ public class EventService {
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
         statsService.saveHit(uri, ip);
+        // small pause to let stats-server process the hit
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException ignored) {
+        }
         return enrichFullDto(event);
     }
-
 
     private void applyUpdateFields(Event event, String annotation, Long categoryId, String description,
                                    LocalDateTime eventDate, EventDto.Location location,
