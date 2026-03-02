@@ -35,7 +35,6 @@ public class EventService {
     private final RequestRepository requestRepository;
     private final StatsService statsService;
 
-
     @Transactional
     public EventDto.EventFullDto createEvent(Long userId, EventDto.NewEventDto dto) {
         User user = userService.getEntityById(userId);
@@ -88,7 +87,7 @@ public class EventService {
         }
 
         if (dto.getEventDate() != null && dto.getEventDate().isBefore(LocalDateTime.now().plusHours(2))) {
-            throw new ConflictException("Event date must be at least 2 hours from now");
+            throw new ValidationException("Event date must be at least 2 hours from now");
         }
 
         applyUpdateFields(event, dto.getAnnotation(), dto.getCategory(), dto.getDescription(),
@@ -146,7 +145,6 @@ public class EventService {
         return enrichFullDto(eventRepository.save(event));
     }
 
-
     public List<EventDto.EventShortDto> getPublicEvents(String text, List<Long> categories, Boolean paid,
                                                         String rangeStart, String rangeEnd,
                                                         Boolean onlyAvailable, String sort,
@@ -193,7 +191,6 @@ public class EventService {
         statsService.saveHit(uri, ip);
         return enrichFullDto(event);
     }
-
 
     private void applyUpdateFields(Event event, String annotation, Long categoryId, String description,
                                    LocalDateTime eventDate, EventDto.Location location,

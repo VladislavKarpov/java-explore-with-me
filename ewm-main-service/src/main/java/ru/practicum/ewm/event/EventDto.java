@@ -47,6 +47,7 @@ public class EventDto {
 
         private Boolean paid = false;
 
+        @Min(0)
         private Integer participantLimit = 0;
 
         private Boolean requestModeration = true;
@@ -109,9 +110,10 @@ public class EventDto {
         private LocalDateTime eventDate;
         private Location location;
         private Boolean paid;
+        @Min(0)
         private Integer participantLimit;
         private Boolean requestModeration;
-        private String stateAction; // SEND_TO_REVIEW, CANCEL_REVIEW
+        private String stateAction;
         @Size(min = 3, max = 120)
         private String title;
     }
@@ -130,6 +132,7 @@ public class EventDto {
         private LocalDateTime eventDate;
         private Location location;
         private Boolean paid;
+        @Min(0)
         private Integer participantLimit;
         private Boolean requestModeration;
         private String stateAction;

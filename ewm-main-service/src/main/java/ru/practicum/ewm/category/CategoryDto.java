@@ -25,6 +25,8 @@ public class CategoryDto {
     @AllArgsConstructor
     public static class ResponseCategoryDto {
         private Long id;
+        @NotBlank
+        @Size(min = 1, max = 50)
         private String name;
     }
 }

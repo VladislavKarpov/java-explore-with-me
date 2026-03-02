@@ -26,14 +26,14 @@ public class StatsService {
         try {
             statsClient.saveHit(appName, uri, ip, LocalDateTime.now());
         } catch (Exception e) {
-            log.warn("Failed to save hit stats: {}", e.getMessage());
+            log.warn("Failed to save hit stats for uri={}: {}", uri, e.getMessage());
         }
     }
 
     public long getViews(String uri) {
         try {
             List<ViewStats> stats = statsClient.getStats(
-                    LocalDateTime.now().minusYears(100),
+                    LocalDateTime.of(2000, 1, 1, 0, 0),
                     LocalDateTime.now().plusYears(100),
                     List.of(uri),
                     true
@@ -42,7 +42,7 @@ public class StatsService {
                 return stats.get(0).getHits();
             }
         } catch (Exception e) {
-            log.warn("Failed to get stats: {}", e.getMessage());
+            log.warn("Failed to get stats for uri={}: {}", uri, e.getMessage());
         }
         return 0L;
     }
@@ -53,16 +53,15 @@ public class StatsService {
         try {
             List<String> uris = eventIds.stream().map(id -> "/events/" + id).collect(Collectors.toList());
             List<ViewStats> stats = statsClient.getStats(
-                    LocalDateTime.now().minusYears(100),
+                    LocalDateTime.of(2000, 1, 1, 0, 0),
                     LocalDateTime.now().plusYears(100),
                     uris,
                     true
             );
             if (stats != null) {
                 for (ViewStats vs : stats) {
-                    String uri = vs.getUri();
                     try {
-                        Long id = Long.parseLong(uri.replace("/events/", ""));
+                        Long id = Long.parseLong(vs.getUri().replace("/events/", ""));
                         result.put(id, vs.getHits());
                     } catch (NumberFormatException ignored) {
                     }

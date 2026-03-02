@@ -13,6 +13,7 @@ import ru.practicum.ewm.user.UserService;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -143,7 +144,8 @@ public class RequestService {
                 .event(req.getEvent().getId())
                 .requester(req.getRequester().getId())
                 .status(req.getStatus().name())
-                .created(req.getCreated().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .created(req.getCreated().truncatedTo(ChronoUnit.MICROS)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")))
                 .build();
     }
 }
