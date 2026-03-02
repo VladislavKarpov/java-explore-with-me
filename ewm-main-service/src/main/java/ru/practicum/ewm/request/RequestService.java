@@ -61,7 +61,7 @@ public class RequestService {
                 .event(event)
                 .requester(user)
                 .status(status)
-                .created(LocalDateTime.now())
+                .created(LocalDateTime.now().truncatedTo(ChronoUnit.MICROS))
                 .build();
 
         return toDto(requestRepository.save(req));
@@ -118,7 +118,6 @@ public class RequestService {
                     alreadyConfirmed++;
                 }
             }
-            // reject all remaining PENDING if limit reached
             if (event.getParticipantLimit() > 0 && alreadyConfirmed >= event.getParticipantLimit()) {
                 List<ParticipationRequest> pendingRequests = requestRepository.findAllByEventId(eventId)
                         .stream().filter(r -> r.getStatus() == RequestStatus.PENDING).collect(Collectors.toList());
@@ -144,8 +143,7 @@ public class RequestService {
                 .event(req.getEvent().getId())
                 .requester(req.getRequester().getId())
                 .status(req.getStatus().name())
-                .created(req.getCreated().truncatedTo(ChronoUnit.MICROS)
-                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")))
+                .created(req.getCreated().truncatedTo(ChronoUnit.MICROS).toString())
                 .build();
     }
 }

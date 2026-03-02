@@ -35,6 +35,7 @@ public class EventService {
     private final RequestRepository requestRepository;
     private final StatsService statsService;
 
+
     @Transactional
     public EventDto.EventFullDto createEvent(Long userId, EventDto.NewEventDto dto) {
         User user = userService.getEntityById(userId);
@@ -111,8 +112,10 @@ public class EventService {
         LocalDateTime start = rangeStart != null ? LocalDateTime.parse(rangeStart, FORMATTER) : null;
         LocalDateTime end = rangeEnd != null ? LocalDateTime.parse(rangeEnd, FORMATTER) : null;
 
-        List<Event> events = eventRepository.findByAdminFilters(users, stateList, categories, start, end,
-                PageRequest.of(from / size, size)).getContent();
+        List<Event> events = eventRepository.findAll(
+                EventSpecifications.adminFilter(users, stateList, categories, start, end),
+                PageRequest.of(from / size, size)
+        ).getContent();
         return enrichFullDtos(events);
     }
 
@@ -122,7 +125,7 @@ public class EventService {
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
         if (dto.getEventDate() != null && dto.getEventDate().isBefore(LocalDateTime.now().plusHours(1))) {
-            throw new ConflictException("Event date must be at least 1 hour from publication time");
+            throw new ValidationException("Event date must be at least 1 hour from publication time");
         }
 
         if ("PUBLISH_EVENT".equals(dto.getStateAction())) {
@@ -145,6 +148,7 @@ public class EventService {
         return enrichFullDto(eventRepository.save(event));
     }
 
+
     public List<EventDto.EventShortDto> getPublicEvents(String text, List<Long> categories, Boolean paid,
                                                         String rangeStart, String rangeEnd,
                                                         Boolean onlyAvailable, String sort,
@@ -163,8 +167,10 @@ public class EventService {
                 ? Sort.by(Sort.Direction.DESC, "id")
                 : Sort.by(Sort.Direction.ASC, "eventDate");
 
-        List<Event> events = eventRepository.findByPublicFilters(text, categories, paid, start, end,
-                PageRequest.of(from / size, size, sortOrder)).getContent();
+        List<Event> events = eventRepository.findAll(
+                EventSpecifications.publicFilter(text, categories, paid, start, end),
+                PageRequest.of(from / size, size, sortOrder)
+        ).getContent();
 
         List<EventDto.EventShortDto> result = enrichShortDtos(events);
 
@@ -191,6 +197,7 @@ public class EventService {
         statsService.saveHit(uri, ip);
         return enrichFullDto(event);
     }
+
 
     private void applyUpdateFields(Event event, String annotation, Long categoryId, String description,
                                    LocalDateTime eventDate, EventDto.Location location,

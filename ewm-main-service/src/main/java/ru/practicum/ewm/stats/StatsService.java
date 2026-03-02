@@ -25,7 +25,7 @@ public class StatsService {
     public void saveHit(String uri, String ip) {
         try {
             statsClient.saveHit(appName, uri, ip, LocalDateTime.now());
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.warn("Failed to save hit stats for uri={}: {}", uri, e.getMessage());
         }
     }
@@ -34,14 +34,14 @@ public class StatsService {
         try {
             List<ViewStats> stats = statsClient.getStats(
                     LocalDateTime.of(2000, 1, 1, 0, 0),
-                    LocalDateTime.now().plusYears(100),
+                    LocalDateTime.now().plusYears(10),
                     List.of(uri),
                     true
             );
             if (stats != null && !stats.isEmpty()) {
                 return stats.get(0).getHits();
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.warn("Failed to get stats for uri={}: {}", uri, e.getMessage());
         }
         return 0L;
@@ -54,7 +54,7 @@ public class StatsService {
             List<String> uris = eventIds.stream().map(id -> "/events/" + id).collect(Collectors.toList());
             List<ViewStats> stats = statsClient.getStats(
                     LocalDateTime.of(2000, 1, 1, 0, 0),
-                    LocalDateTime.now().plusYears(100),
+                    LocalDateTime.now().plusYears(10),
                     uris,
                     true
             );
@@ -67,7 +67,7 @@ public class StatsService {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.warn("Failed to get stats map: {}", e.getMessage());
         }
         return result;
