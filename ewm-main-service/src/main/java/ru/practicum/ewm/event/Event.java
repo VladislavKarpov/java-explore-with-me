@@ -65,8 +65,4 @@ public class Event {
 
     @Column(name = "published_on")
     private LocalDateTime publishedOn;
-
-    @Column(name = "views", nullable = false)
-    @Builder.Default
-    private Long views = 0L;
 }

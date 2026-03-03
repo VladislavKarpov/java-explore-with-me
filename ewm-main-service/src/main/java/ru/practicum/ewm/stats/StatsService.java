@@ -31,9 +31,12 @@ public class StatsService {
 
     public long getViews(String uri) {
         try {
-            LocalDateTime start = LocalDateTime.of(2000, 1, 1, 0, 0);
-            LocalDateTime end = LocalDateTime.now().plusSeconds(1);
-            List<ViewStats> stats = statsClient.getStats(start, end, List.of(uri), false);
+            List<ViewStats> stats = statsClient.getStats(
+                    LocalDateTime.of(2000, 1, 1, 0, 0),
+                    LocalDateTime.now().plusSeconds(1),
+                    List.of(uri),
+                    true
+            );
             if (stats != null && !stats.isEmpty()) {
                 return stats.get(0).getHits();
             }
@@ -44,16 +47,17 @@ public class StatsService {
     }
 
     public Map<Long, Long> getViewsMap(List<Long> eventIds) {
-        if (eventIds == null || eventIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
+        if (eventIds == null || eventIds.isEmpty()) return Collections.emptyMap();
         try {
             List<String> uris = eventIds.stream()
                     .map(id -> "/events/" + id)
                     .collect(Collectors.toList());
-            LocalDateTime start = LocalDateTime.of(2000, 1, 1, 0, 0);
-            LocalDateTime end = LocalDateTime.now().plusSeconds(1);
-            List<ViewStats> stats = statsClient.getStats(start, end, uris, false);
+            List<ViewStats> stats = statsClient.getStats(
+                    LocalDateTime.of(2000, 1, 1, 0, 0),
+                    LocalDateTime.now().plusSeconds(1),
+                    uris,
+                    true
+            );
             Map<Long, Long> result = new HashMap<>();
             if (stats != null) {
                 for (ViewStats stat : stats) {
