@@ -203,17 +203,33 @@ public class EventService {
     }
 
     public EventDto.EventFullDto getPublicEvent(Long id, String ip, String uri) {
-        log.info("Getting public event id={} from ip={}", id, ip);
+        log.info("GET PUBLIC EVENT - id: {}, ip: {}, uri: {}", id, ip, uri);
 
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
+        log.info("Saving hit for event {}", id);
         statsService.saveHit(uri, ip);
 
+        long views = 0;
+        int attempts = 0;
+        while (attempts < 5) {
+            try {
+                Thread.sleep(200); // 200ms задержка
+                views = statsService.getViews(uri);
+                log.info("Attempt {}: views = {}", attempts + 1, views);
+
+                if (views > 0) {
+                    break;
+                }
+                attempts++;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+
         long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-
-        long views = getViewsWithRetry(uri, 3, 100);
-
         log.info("Event {}: confirmed={}, views={}", id, confirmed, views);
 
         return toFullDto(event, confirmed, views);

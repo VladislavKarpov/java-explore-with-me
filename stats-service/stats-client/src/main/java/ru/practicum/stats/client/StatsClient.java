@@ -21,7 +21,7 @@ public class StatsClient {
     private final RestTemplate restTemplate;
     private final String serverUrl;
 
-    public StatsClient(@Value("${stats.server.url:http://stats-server:9090}") String serverUrl) {
+    public StatsClient(@Value("${stats.server.url}") String serverUrl) {
         this.restTemplate = new RestTemplate();
         this.serverUrl = serverUrl;
         log.info("StatsClient initialized with server URL: {}", serverUrl);
@@ -40,13 +40,13 @@ public class StatsClient {
         HttpEntity<EndpointHit> entity = new HttpEntity<>(hit, headers);
 
         String url = serverUrl + "/hit";
-        log.info("Sending POST request to {} with hit: {}", url, hit);
+        log.info("Sending hit to stats server: {} {} {} {}", app, uri, ip, timestamp);
 
         try {
             ResponseEntity<Void> response = restTemplate.postForEntity(url, entity, Void.class);
-            log.info("Response status: {}", response.getStatusCode());
+            log.info("Hit saved, response status: {}", response.getStatusCode());
         } catch (Exception e) {
-            log.error("Error saving hit: {}", e.getMessage(), e);
+            log.error("Error saving hit: {}", e.getMessage());
             throw e;
         }
     }
@@ -62,7 +62,7 @@ public class StatsClient {
         }
 
         String url = builder.toUriString();
-        log.info("Sending GET request to {}", url);
+        log.info("Getting stats from: {}", url);
 
         try {
             ResponseEntity<List<ViewStats>> response = restTemplate.exchange(
@@ -71,11 +71,10 @@ public class StatsClient {
                     null,
                     new ParameterizedTypeReference<List<ViewStats>>() {}
             );
-            log.info("Response status: {}, body size: {}", response.getStatusCode(),
-                    response.getBody() != null ? response.getBody().size() : 0);
+            log.info("Stats received, count: {}", response.getBody() != null ? response.getBody().size() : 0);
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error getting stats: {}", e.getMessage(), e);
+            log.error("Error getting stats: {}", e.getMessage());
             return List.of();
         }
     }
