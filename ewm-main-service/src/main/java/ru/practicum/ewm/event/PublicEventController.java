@@ -10,26 +10,62 @@ import java.util.List;
 @RequestMapping("/events")
 @RequiredArgsConstructor
 public class PublicEventController {
+
     private final EventService eventService;
 
     @GetMapping
-    public List<EventDto.EventShortDto> getEvents_1(
+    public List<EventDto.EventShortDto> getEvents(
             @RequestParam(required = false) String text,
             @RequestParam(required = false) List<Long> categories,
             @RequestParam(required = false) Boolean paid,
             @RequestParam(required = false) String rangeStart,
             @RequestParam(required = false) String rangeEnd,
             @RequestParam(defaultValue = "false") Boolean onlyAvailable,
-            @RequestParam(required = false) String sort,
-            @RequestParam(defaultValue = "0") int from,
-            @RequestParam(defaultValue = "10") int size,
-            HttpServletRequest request) {
-        return eventService.getPublicEvents(text, categories, paid, rangeStart, rangeEnd,
-                onlyAvailable, sort, from, size, request.getRemoteAddr(), request.getRequestURI());
+            @RequestParam(defaultValue = "EVENT_DATE") String sort,
+            @RequestParam(defaultValue = "0") Integer from,
+            @RequestParam(defaultValue = "10") Integer size,
+            HttpServletRequest request
+    ) {
+
+        String ip = extractIp(request);
+
+        return eventService.getPublicEvents(
+                text,
+                categories,
+                paid,
+                rangeStart,
+                rangeEnd,
+                onlyAvailable,
+                sort,
+                from,
+                size,
+                ip,
+                request.getRequestURI()
+        );
     }
 
     @GetMapping("/{id}")
-    public EventDto.EventFullDto getEvent_1(@PathVariable Long id, HttpServletRequest request) {
-        return eventService.getPublicEvent(id, request.getRemoteAddr(), request.getRequestURI());
+    public EventDto.EventFullDto getEvent(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+
+        String ip = extractIp(request);
+
+        return eventService.getPublicEvent(
+                id,
+                ip,
+                request.getRequestURI()
+        );
+    }
+
+    private String extractIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+
+        if (ip != null && !ip.isBlank()) {
+            return ip.split(",")[0].trim();
+        }
+
+        return request.getRemoteAddr();
     }
 }
