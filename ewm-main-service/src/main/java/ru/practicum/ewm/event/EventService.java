@@ -30,6 +30,7 @@ public class EventService {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final EventRepository eventRepository;
+    private final EventViewRepository eventViewRepository;
     private final UserService userService;
     private final CategoryService categoryService;
     private final RequestRepository requestRepository;
@@ -60,7 +61,7 @@ public class EventService {
                 .createdOn(LocalDateTime.now())
                 .build();
 
-        return toFullDto(eventRepository.save(event), 0L, 0L);
+        return toFullDto(eventRepository.save(event), 0L);
     }
 
     public List<EventDto.EventShortDto> getUserEvents(Long userId, int from, int size) {
@@ -162,7 +163,7 @@ public class EventService {
         }
 
         Sort sortOrder = "VIEWS".equals(sort)
-                ? Sort.by(Sort.Direction.DESC, "id")
+                ? Sort.by(Sort.Direction.DESC, "views")
                 : Sort.by(Sort.Direction.ASC, "eventDate");
 
         List<Event> events = eventRepository.findAll(
@@ -195,14 +196,21 @@ public class EventService {
         return result;
     }
 
+    @Transactional
     public EventDto.EventFullDto getPublicEvent(Long id, String ip, String uri) {
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
+        if (!eventViewRepository.existsByEventIdAndIp(id, ip)) {
+            eventViewRepository.save(EventView.builder().eventId(id).ip(ip).build());
+            eventRepository.incrementViews(id);
+            event = eventRepository.findById(id).orElse(event);
+        }
+
         statsService.saveHit(uri, ip);
-        long views = statsService.getViews(uri);
+
         long confirmed = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
-        return toFullDto(event, confirmed, views);
+        return toFullDto(event, confirmed);
     }
 
     private void applyUpdateFields(Event event, String annotation, Long categoryId, String description,
@@ -225,19 +233,15 @@ public class EventService {
 
     public EventDto.EventFullDto enrichFullDto(Event event) {
         long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-        long views = statsService.getViews("/events/" + event.getId());
-        return toFullDto(event, confirmed, views);
+        return toFullDto(event, confirmed);
     }
 
     private List<EventDto.EventFullDto> enrichFullDtos(List<Event> events) {
         if (events.isEmpty()) return Collections.emptyList();
         List<Long> ids = events.stream().map(Event::getId).collect(Collectors.toList());
         Map<Long, Long> confirmedMap = getConfirmedMap(ids);
-        Map<Long, Long> viewsMap = statsService.getViewsMap(ids);
         return events.stream()
-                .map(e -> toFullDto(e,
-                        confirmedMap.getOrDefault(e.getId(), 0L),
-                        viewsMap.getOrDefault(e.getId(), 0L)))
+                .map(e -> toFullDto(e, confirmedMap.getOrDefault(e.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
@@ -245,11 +249,8 @@ public class EventService {
         if (events.isEmpty()) return Collections.emptyList();
         List<Long> ids = events.stream().map(Event::getId).collect(Collectors.toList());
         Map<Long, Long> confirmedMap = getConfirmedMap(ids);
-        Map<Long, Long> viewsMap = statsService.getViewsMap(ids);
         return events.stream()
-                .map(e -> toShortDto(e,
-                        confirmedMap.getOrDefault(e.getId(), 0L),
-                        viewsMap.getOrDefault(e.getId(), 0L)))
+                .map(e -> toShortDto(e, confirmedMap.getOrDefault(e.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
@@ -260,7 +261,7 @@ public class EventService {
         return map;
     }
 
-    public EventDto.EventFullDto toFullDto(Event e, long confirmed, long views) {
+    public EventDto.EventFullDto toFullDto(Event e, long confirmed) {
         return EventDto.EventFullDto.builder()
                 .id(e.getId())
                 .annotation(e.getAnnotation())
@@ -279,11 +280,15 @@ public class EventService {
                 .requestModeration(e.getRequestModeration())
                 .state(e.getState().name())
                 .title(e.getTitle())
-                .views(views)
+                .views(e.getViews())
                 .build();
     }
 
     public EventDto.EventShortDto toShortDto(Event e, long confirmed, long views) {
+        return toShortDto(e, confirmed);
+    }
+
+    public EventDto.EventShortDto toShortDto(Event e, long confirmed) {
         return EventDto.EventShortDto.builder()
                 .id(e.getId())
                 .annotation(e.getAnnotation())
@@ -295,7 +300,7 @@ public class EventService {
                         .id(e.getInitiator().getId()).name(e.getInitiator().getName()).build())
                 .paid(e.getPaid())
                 .title(e.getTitle())
-                .views(views)
+                .views(e.getViews())
                 .build();
     }
 
