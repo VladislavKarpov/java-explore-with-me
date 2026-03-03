@@ -8,15 +8,14 @@ import ru.practicum.stats.client.StatsClient;
 import ru.practicum.stats.dto.ViewStats;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class StatsService {
+
     private final StatsClient statsClient;
 
     @Value("${spring.application.name:ewm-main-service}")
@@ -24,70 +23,51 @@ public class StatsService {
 
     public void saveHit(String uri, String ip) {
         try {
-            LocalDateTime now = LocalDateTime.now();
-            log.info("Saving hit - app: {}, uri: {}, ip: {}", appName, uri, ip);
-            statsClient.saveHit(appName, uri, ip, now);
-            log.info("Hit saved successfully");
-        } catch (Exception e) {
-            log.error("Failed to save hit: {}", e.getMessage());
+            statsClient.saveHit(appName, uri, ip, LocalDateTime.now());
+        } catch (Throwable e) {
+            log.warn("Failed to save hit for uri={}: {}", uri, e.getMessage());
         }
     }
 
     public long getViews(String uri) {
         try {
-            log.info("Getting views for uri: {}", uri);
-            LocalDateTime start = LocalDateTime.now().minusYears(100);
-            LocalDateTime end = LocalDateTime.now().plusYears(100);
-
-            List<ViewStats> stats = statsClient.getStats(start, end, List.of(uri), true);
-
+            LocalDateTime start = LocalDateTime.of(2000, 1, 1, 0, 0);
+            LocalDateTime end = LocalDateTime.now().plusSeconds(1);
+            List<ViewStats> stats = statsClient.getStats(start, end, List.of(uri), false);
             if (stats != null && !stats.isEmpty()) {
-                long views = stats.get(0).getHits();
-                log.info("Views for {}: {}", uri, views);
-                return views;
+                return stats.get(0).getHits();
             }
-            log.info("No views found for {}", uri);
-            return 0L;
-        } catch (Exception e) {
-            log.error("Error getting views: {}", e.getMessage());
-            return 0L;
+        } catch (Throwable e) {
+            log.warn("Failed to get views for uri={}: {}", uri, e.getMessage());
         }
+        return 0L;
     }
 
     public Map<Long, Long> getViewsMap(List<Long> eventIds) {
-        Map<Long, Long> result = new HashMap<>();
         if (eventIds == null || eventIds.isEmpty()) {
-            return result;
+            return Collections.emptyMap();
         }
-
         try {
             List<String> uris = eventIds.stream()
                     .map(id -> "/events/" + id)
                     .collect(Collectors.toList());
-
-            log.info("Getting views map for events: {}", eventIds);
-
-            LocalDateTime start = LocalDateTime.now().minusYears(100);
-            LocalDateTime end = LocalDateTime.now().plusYears(100);
-
-            List<ViewStats> stats = statsClient.getStats(start, end, uris, true);
-
+            LocalDateTime start = LocalDateTime.of(2000, 1, 1, 0, 0);
+            LocalDateTime end = LocalDateTime.now().plusSeconds(1);
+            List<ViewStats> stats = statsClient.getStats(start, end, uris, false);
+            Map<Long, Long> result = new HashMap<>();
             if (stats != null) {
                 for (ViewStats stat : stats) {
-                    String uri = stat.getUri();
                     try {
-                        Long eventId = Long.parseLong(uri.replace("/events/", ""));
+                        Long eventId = Long.parseLong(stat.getUri().replace("/events/", ""));
                         result.put(eventId, stat.getHits());
-                        log.info("Event {} has {} views", eventId, stat.getHits());
-                    } catch (NumberFormatException e) {
-                        log.warn("Failed to parse event id from uri: {}", uri);
+                    } catch (NumberFormatException ignored) {
                     }
                 }
             }
-        } catch (Exception e) {
-            log.error("Error getting views map: {}", e.getMessage());
+            return result;
+        } catch (Throwable e) {
+            log.warn("Failed to get views map: {}", e.getMessage());
+            return Collections.emptyMap();
         }
-
-        return result;
     }
 }

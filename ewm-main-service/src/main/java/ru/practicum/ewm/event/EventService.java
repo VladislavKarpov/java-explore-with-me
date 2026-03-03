@@ -1,12 +1,12 @@
 package ru.practicum.ewm.event;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.category.Category;
+import ru.practicum.ewm.category.CategoryDto;
 import ru.practicum.ewm.category.CategoryService;
 import ru.practicum.ewm.exception.ConflictException;
 import ru.practicum.ewm.exception.NotFoundException;
@@ -17,14 +17,12 @@ import ru.practicum.ewm.stats.StatsService;
 import ru.practicum.ewm.user.User;
 import ru.practicum.ewm.user.UserDto;
 import ru.practicum.ewm.user.UserService;
-import ru.practicum.ewm.category.CategoryDto;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -36,7 +34,6 @@ public class EventService {
     private final CategoryService categoryService;
     private final RequestRepository requestRepository;
     private final StatsService statsService;
-
 
     @Transactional
     public EventDto.EventFullDto createEvent(Long userId, EventDto.NewEventDto dto) {
@@ -63,13 +60,12 @@ public class EventService {
                 .createdOn(LocalDateTime.now())
                 .build();
 
-        return toFullDto(eventRepository.save(event), 0L, 0L);
+        return toFullDto(eventRepository.save(event), 0L);
     }
 
     public List<EventDto.EventShortDto> getUserEvents(Long userId, int from, int size) {
         userService.getEntityById(userId);
-        PageRequest pageRequest = PageRequest.of(from / size, size);
-        List<Event> events = eventRepository.findAllByInitiatorId(userId, pageRequest).getContent();
+        List<Event> events = eventRepository.findAllByInitiatorId(userId, PageRequest.of(from / size, size)).getContent();
         return enrichShortDtos(events);
     }
 
@@ -89,7 +85,6 @@ public class EventService {
         if (event.getState() == EventState.PUBLISHED) {
             throw new ConflictException("Only pending or canceled events can be changed");
         }
-
         if (dto.getEventDate() != null && dto.getEventDate().isBefore(LocalDateTime.now().plusHours(2))) {
             throw new ValidationException("Event date must be at least 2 hours from now");
         }
@@ -107,7 +102,6 @@ public class EventService {
         return enrichFullDto(eventRepository.save(event));
     }
 
-
     public List<EventDto.EventFullDto> getEventsByAdmin(List<Long> users, List<String> states, List<Long> categories,
                                                         String rangeStart, String rangeEnd, int from, int size) {
         List<EventState> stateList = states != null
@@ -115,12 +109,10 @@ public class EventService {
         LocalDateTime start = rangeStart != null ? LocalDateTime.parse(rangeStart, FORMATTER) : null;
         LocalDateTime end = rangeEnd != null ? LocalDateTime.parse(rangeEnd, FORMATTER) : null;
 
-        PageRequest pageRequest = PageRequest.of(from / size, size);
         List<Event> events = eventRepository.findAll(
                 EventSpecifications.adminFilter(users, stateList, categories, start, end),
-                pageRequest
+                PageRequest.of(from / size, size)
         ).getContent();
-
         return enrichFullDtos(events);
     }
 
@@ -156,8 +148,7 @@ public class EventService {
     public List<EventDto.EventShortDto> getPublicEvents(String text, List<Long> categories, Boolean paid,
                                                         String rangeStart, String rangeEnd,
                                                         Boolean onlyAvailable, String sort,
-                                                        int from, int size,
-                                                        String ip, String uri) {
+                                                        int from, int size, String ip, String uri) {
         statsService.saveHit(uri, ip);
 
         LocalDateTime start = rangeStart != null ? LocalDateTime.parse(rangeStart, FORMATTER) : LocalDateTime.now();
@@ -168,13 +159,12 @@ public class EventService {
         }
 
         Sort sortOrder = "VIEWS".equals(sort)
-                ? Sort.by(Sort.Direction.DESC, "id")
+                ? Sort.by(Sort.Direction.DESC, "views")
                 : Sort.by(Sort.Direction.ASC, "eventDate");
 
-        PageRequest pageRequest = PageRequest.of(from / size, size, sortOrder);
         List<Event> events = eventRepository.findAll(
                 EventSpecifications.publicFilter(text, categories, paid, start, end),
-                pageRequest
+                PageRequest.of(from / size, size, sortOrder)
         ).getContent();
 
         List<EventDto.EventShortDto> result = enrichShortDtos(events);
@@ -182,84 +172,30 @@ public class EventService {
         if (Boolean.TRUE.equals(onlyAvailable)) {
             result = result.stream()
                     .filter(e -> {
-                        Event ev = events.stream()
-                                .filter(ev2 -> ev2.getId().equals(e.getId()))
-                                .findFirst()
-                                .orElse(null);
+                        Event ev = events.stream().filter(ev2 -> ev2.getId().equals(e.getId())).findFirst().orElse(null);
                         if (ev == null) return false;
                         return ev.getParticipantLimit() == 0 || e.getConfirmedRequests() < ev.getParticipantLimit();
                     })
                     .collect(Collectors.toList());
         }
 
-        if ("VIEWS".equals(sort)) {
-            result.sort((e1, e2) -> Long.compare(
-                    Optional.ofNullable(e2.getViews()).orElse(0L),
-                    Optional.ofNullable(e1.getViews()).orElse(0L)
-            ));
-        }
-
         return result;
     }
 
+    @Transactional
     public EventDto.EventFullDto getPublicEvent(Long id, String ip, String uri) {
-        log.info("GET PUBLIC EVENT - id: {}, ip: {}, uri: {}", id, ip, uri);
-
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
-        log.info("Saving hit for event {}", id);
         statsService.saveHit(uri, ip);
+        eventRepository.incrementViews(id);
 
-        long views = 0;
-        int attempts = 0;
-        while (attempts < 5) {
-            try {
-                Thread.sleep(200); // 200ms задержка
-                views = statsService.getViews(uri);
-                log.info("Attempt {}: views = {}", attempts + 1, views);
+        // перечитываем чтобы получить обновлённый views
+        event = eventRepository.findById(id).orElse(event);
 
-                if (views > 0) {
-                    break;
-                }
-                attempts++;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-
-        long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-        log.info("Event {}: confirmed={}, views={}", id, confirmed, views);
-
-        return toFullDto(event, confirmed, views);
+        long confirmed = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
+        return toFullDto(event, confirmed);
     }
-
-    private long getViewsWithRetry(String uri, int maxAttempts, long delayMs) {
-        int attempts = 0;
-        long views = 0;
-
-        while (attempts < maxAttempts) {
-            try {
-                views = statsService.getViews(uri);
-                if (views > 0 || attempts == maxAttempts - 1) {
-                    return views;
-                }
-                attempts++;
-                if (attempts < maxAttempts) {
-                    Thread.sleep(delayMs);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                log.warn("Error getting views on attempt {}: {}", attempts, e.getMessage());
-                attempts++;
-            }
-        }
-        return views;
-    }
-
 
     private void applyUpdateFields(Event event, String annotation, Long categoryId, String description,
                                    LocalDateTime eventDate, EventDto.Location location,
@@ -280,65 +216,45 @@ public class EventService {
 
     public EventDto.EventFullDto enrichFullDto(Event event) {
         long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-        long views = statsService.getViews("/events/" + event.getId());
-        return toFullDto(event, confirmed, views);
+        return toFullDto(event, confirmed);
     }
 
     private List<EventDto.EventFullDto> enrichFullDtos(List<Event> events) {
         if (events.isEmpty()) return Collections.emptyList();
-
         List<Long> ids = events.stream().map(Event::getId).collect(Collectors.toList());
         Map<Long, Long> confirmedMap = getConfirmedMap(ids);
-        Map<Long, Long> viewsMap = statsService.getViewsMap(ids);
-
         return events.stream()
-                .map(e -> toFullDto(
-                        e,
-                        confirmedMap.getOrDefault(e.getId(), 0L),
-                        viewsMap.getOrDefault(e.getId(), 0L)))
+                .map(e -> toFullDto(e, confirmedMap.getOrDefault(e.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
     private List<EventDto.EventShortDto> enrichShortDtos(List<Event> events) {
         if (events.isEmpty()) return Collections.emptyList();
-
         List<Long> ids = events.stream().map(Event::getId).collect(Collectors.toList());
         Map<Long, Long> confirmedMap = getConfirmedMap(ids);
-        Map<Long, Long> viewsMap = statsService.getViewsMap(ids);
-
         return events.stream()
-                .map(e -> toShortDto(
-                        e,
-                        confirmedMap.getOrDefault(e.getId(), 0L),
-                        viewsMap.getOrDefault(e.getId(), 0L)))
+                .map(e -> toShortDto(e, confirmedMap.getOrDefault(e.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
     private Map<Long, Long> getConfirmedMap(List<Long> ids) {
         Map<Long, Long> map = new HashMap<>();
-        List<Object[]> results = requestRepository.countConfirmedByEventIds(ids);
-        for (Object[] row : results) {
-            map.put((Long) row[0], (Long) row[1]);
-        }
+        requestRepository.countConfirmedByEventIds(ids).forEach(row -> map.put((Long) row[0], (Long) row[1]));
         return map;
     }
 
-    public EventDto.EventFullDto toFullDto(Event e, long confirmed, long views) {
+    public EventDto.EventFullDto toFullDto(Event e, long confirmed) {
         return EventDto.EventFullDto.builder()
                 .id(e.getId())
                 .annotation(e.getAnnotation())
                 .category(CategoryDto.ResponseCategoryDto.builder()
-                        .id(e.getCategory().getId())
-                        .name(e.getCategory().getName())
-                        .build())
+                        .id(e.getCategory().getId()).name(e.getCategory().getName()).build())
                 .confirmedRequests(confirmed)
                 .createdOn(e.getCreatedOn() != null ? e.getCreatedOn().format(FORMATTER) : null)
                 .description(e.getDescription())
                 .eventDate(e.getEventDate().format(FORMATTER))
                 .initiator(UserDto.UserShortDto.builder()
-                        .id(e.getInitiator().getId())
-                        .name(e.getInitiator().getName())
-                        .build())
+                        .id(e.getInitiator().getId()).name(e.getInitiator().getName()).build())
                 .location(new EventDto.Location(e.getLat(), e.getLon()))
                 .paid(e.getPaid())
                 .participantLimit(e.getParticipantLimit())
@@ -346,28 +262,28 @@ public class EventService {
                 .requestModeration(e.getRequestModeration())
                 .state(e.getState().name())
                 .title(e.getTitle())
-                .views(views)
+                .views(e.getViews())
                 .build();
     }
 
-    public EventDto.EventShortDto toShortDto(Event e, long confirmed, long views) {
+    public EventDto.EventShortDto toShortDto(Event e, long confirmed) {
         return EventDto.EventShortDto.builder()
                 .id(e.getId())
                 .annotation(e.getAnnotation())
                 .category(CategoryDto.ResponseCategoryDto.builder()
-                        .id(e.getCategory().getId())
-                        .name(e.getCategory().getName())
-                        .build())
+                        .id(e.getCategory().getId()).name(e.getCategory().getName()).build())
                 .confirmedRequests(confirmed)
                 .eventDate(e.getEventDate().format(FORMATTER))
                 .initiator(UserDto.UserShortDto.builder()
-                        .id(e.getInitiator().getId())
-                        .name(e.getInitiator().getName())
-                        .build())
+                        .id(e.getInitiator().getId()).name(e.getInitiator().getName()).build())
                 .paid(e.getPaid())
                 .title(e.getTitle())
-                .views(views)
+                .views(e.getViews())
                 .build();
+    }
+
+    public EventDto.EventShortDto toShortDto(Event e, long confirmed, long views) {
+        return toShortDto(e, confirmed);
     }
 
     public Event getEntityById(Long eventId) {
