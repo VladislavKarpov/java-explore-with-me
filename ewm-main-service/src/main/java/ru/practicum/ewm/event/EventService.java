@@ -192,12 +192,9 @@ public class EventService {
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
         statsService.saveHit(uri, ip);
-        // small pause to let stats-server process the hit
-        try {
-            Thread.sleep(100);
-        } catch (InterruptedException ignored) {
-        }
-        return enrichFullDto(event);
+        long views = statsService.getViews(uri);
+        long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
+        return toFullDto(event, confirmed, views);
     }
 
     private void applyUpdateFields(Event event, String annotation, Long categoryId, String description,
