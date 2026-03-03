@@ -25,8 +25,9 @@ public class StatsService {
     public void saveHit(String uri, String ip) {
         try {
             statsClient.saveHit(appName, uri, ip, LocalDateTime.now());
+            log.info("Saved hit: uri={}, ip={}", uri, ip);
         } catch (Throwable e) {
-            log.warn("Failed to save hit stats for uri={}: {}", uri, e.getMessage());
+            log.error("Failed to save hit stats for uri={}: {}", uri, e.getMessage(), e);
         }
     }
 
@@ -36,8 +37,9 @@ public class StatsService {
                     LocalDateTime.of(2000, 1, 1, 0, 0),
                     LocalDateTime.now().plusYears(10),
                     List.of(uri),
-                    true
+                    false
             );
+            log.info("getViews for uri={}, result={}", uri, stats);
             if (stats != null && !stats.isEmpty()) {
                 return stats.get(0).getHits();
             }
@@ -56,7 +58,7 @@ public class StatsService {
                     LocalDateTime.of(2000, 1, 1, 0, 0),
                     LocalDateTime.now().plusYears(10),
                     uris,
-                    true
+                    false
             );
             if (stats != null) {
                 for (ViewStats vs : stats) {
