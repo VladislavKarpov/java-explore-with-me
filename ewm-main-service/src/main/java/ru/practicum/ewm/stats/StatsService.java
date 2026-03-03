@@ -24,54 +24,77 @@ public class StatsService {
 
     public void saveHit(String uri, String ip) {
         try {
+            log.info("Saving hit - app: {}, uri: {}, ip: {}, time: {}", appName, uri, ip, LocalDateTime.now());
             statsClient.saveHit(appName, uri, ip, LocalDateTime.now());
-            log.info("Saved hit: uri={}, ip={}", uri, ip);
-        } catch (Throwable e) {
-            log.error("Failed to save hit stats for uri={}: {}", uri, e.getMessage(), e);
+            log.info("Hit saved successfully for uri: {}", uri);
+        } catch (Exception e) {
+            log.error("Failed to save hit stats: {}", e.getMessage(), e);
         }
     }
 
     public long getViews(String uri) {
         try {
-            List<ViewStats> stats = statsClient.getStats(
-                    LocalDateTime.of(2000, 1, 1, 0, 0),
-                    LocalDateTime.now().plusYears(10),
-                    List.of(uri),
-                    false
-            );
-            log.info("getViews for uri={}, result={}", uri, stats);
+            log.info("Getting views for uri: {}", uri);
+            LocalDateTime start = LocalDateTime.now().minusYears(100);
+            LocalDateTime end = LocalDateTime.now().plusYears(100);
+
+            Thread.sleep(100);
+
+            List<ViewStats> stats = statsClient.getStats(start, end, List.of(uri), true);
+
             if (stats != null && !stats.isEmpty()) {
-                return stats.get(0).getHits();
+                long views = stats.get(0).getHits();
+                log.info("Views for uri {}: {}", uri, views);
+                return views;
             }
-        } catch (Throwable e) {
-            log.warn("Failed to get stats for uri={}: {}", uri, e.getMessage());
+            log.info("No stats found for uri: {}", uri);
+            return 0L;
+        } catch (Exception e) {
+            log.error("Failed to get stats: {}", e.getMessage(), e);
+            return 0L;
         }
-        return 0L;
     }
 
     public Map<Long, Long> getViewsMap(List<Long> eventIds) {
         Map<Long, Long> result = new HashMap<>();
-        if (eventIds == null || eventIds.isEmpty()) return result;
+        if (eventIds == null || eventIds.isEmpty()) {
+            return result;
+        }
+
         try {
-            List<String> uris = eventIds.stream().map(id -> "/events/" + id).collect(Collectors.toList());
-            List<ViewStats> stats = statsClient.getStats(
-                    LocalDateTime.of(2000, 1, 1, 0, 0),
-                    LocalDateTime.now().plusYears(10),
-                    uris,
-                    false
-            );
+            List<String> uris = eventIds.stream()
+                    .map(id -> "/events/" + id)
+                    .collect(Collectors.toList());
+
+            log.info("Getting views map for {} events", eventIds.size());
+
+            LocalDateTime start = LocalDateTime.now().minusYears(100);
+            LocalDateTime end = LocalDateTime.now().plusYears(100);
+
+            List<ViewStats> stats = statsClient.getStats(start, end, uris, true);
+
             if (stats != null) {
                 for (ViewStats vs : stats) {
+                    String uri = vs.getUri();
                     try {
-                        Long id = Long.parseLong(vs.getUri().replace("/events/", ""));
+                        Long id = Long.parseLong(uri.replace("/events/", ""));
                         result.put(id, vs.getHits());
-                    } catch (NumberFormatException ignored) {
+                        log.debug("Event {} has {} views", id, vs.getHits());
+                    } catch (NumberFormatException e) {
+                        log.warn("Failed to parse event id from uri: {}", uri);
                     }
                 }
             }
-        } catch (Throwable e) {
-            log.warn("Failed to get stats map: {}", e.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to get stats map: {}", e.getMessage(), e);
         }
+
+        log.info("Views map result size: {}", result.size());
         return result;
+    }
+
+    public long saveHitAndGetViews(String uri, String ip) {
+        saveHit(uri, ip);
+        return getViews(uri);
     }
 }

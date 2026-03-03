@@ -158,7 +158,6 @@ public class EventService {
                                                         Boolean onlyAvailable, String sort,
                                                         int from, int size,
                                                         String ip, String uri) {
-        // Сохраняем хит для поиска
         statsService.saveHit(uri, ip);
 
         LocalDateTime start = rangeStart != null ? LocalDateTime.parse(rangeStart, FORMATTER) : LocalDateTime.now();
@@ -169,7 +168,7 @@ public class EventService {
         }
 
         Sort sortOrder = "VIEWS".equals(sort)
-                ? Sort.by(Sort.Direction.DESC, "id") // Временная сортировка, потом пересортируем по views
+                ? Sort.by(Sort.Direction.DESC, "id")
                 : Sort.by(Sort.Direction.ASC, "eventDate");
 
         PageRequest pageRequest = PageRequest.of(from / size, size, sortOrder);
@@ -178,10 +177,8 @@ public class EventService {
                 pageRequest
         ).getContent();
 
-        // Обогащаем данными
         List<EventDto.EventShortDto> result = enrichShortDtos(events);
 
-        // Фильтруем только доступные
         if (Boolean.TRUE.equals(onlyAvailable)) {
             result = result.stream()
                     .filter(e -> {
@@ -206,23 +203,45 @@ public class EventService {
     }
 
     public EventDto.EventFullDto getPublicEvent(Long id, String ip, String uri) {
-        // 1. Сначала сохраняем хит в статистику (ВАЖНО: до получения события)
-        statsService.saveHit(uri, ip);
+        log.info("Getting public event id={} from ip={}", id, ip);
 
-        // 2. Затем получаем событие из БД
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
-        // 3. Получаем количество подтвержденных запросов
+        statsService.saveHit(uri, ip);
+
         long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
 
-        // 4. Получаем количество просмотров (уже с учетом нового хита)
-        long views = statsService.getViews(uri);
+        long views = getViewsWithRetry(uri, 3, 100);
 
-        log.debug("Event {}: confirmed={}, views={}", id, confirmed, views);
+        log.info("Event {}: confirmed={}, views={}", id, confirmed, views);
 
-        // 5. Возвращаем полное DTO с актуальными данными
         return toFullDto(event, confirmed, views);
+    }
+
+    private long getViewsWithRetry(String uri, int maxAttempts, long delayMs) {
+        int attempts = 0;
+        long views = 0;
+
+        while (attempts < maxAttempts) {
+            try {
+                views = statsService.getViews(uri);
+                if (views > 0 || attempts == maxAttempts - 1) {
+                    return views;
+                }
+                attempts++;
+                if (attempts < maxAttempts) {
+                    Thread.sleep(delayMs);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.warn("Error getting views on attempt {}: {}", attempts, e.getMessage());
+                attempts++;
+            }
+        }
+        return views;
     }
 
 
