@@ -1,6 +1,7 @@
 package ru.practicum.ewm.event;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -34,6 +36,7 @@ public class EventService {
     private final CategoryService categoryService;
     private final RequestRepository requestRepository;
     private final StatsService statsService;
+
 
     @Transactional
     public EventDto.EventFullDto createEvent(Long userId, EventDto.NewEventDto dto) {
@@ -65,7 +68,8 @@ public class EventService {
 
     public List<EventDto.EventShortDto> getUserEvents(Long userId, int from, int size) {
         userService.getEntityById(userId);
-        List<Event> events = eventRepository.findAllByInitiatorId(userId, PageRequest.of(from / size, size)).getContent();
+        PageRequest pageRequest = PageRequest.of(from / size, size);
+        List<Event> events = eventRepository.findAllByInitiatorId(userId, pageRequest).getContent();
         return enrichShortDtos(events);
     }
 
@@ -103,6 +107,7 @@ public class EventService {
         return enrichFullDto(eventRepository.save(event));
     }
 
+
     public List<EventDto.EventFullDto> getEventsByAdmin(List<Long> users, List<String> states, List<Long> categories,
                                                         String rangeStart, String rangeEnd, int from, int size) {
         List<EventState> stateList = states != null
@@ -110,10 +115,12 @@ public class EventService {
         LocalDateTime start = rangeStart != null ? LocalDateTime.parse(rangeStart, FORMATTER) : null;
         LocalDateTime end = rangeEnd != null ? LocalDateTime.parse(rangeEnd, FORMATTER) : null;
 
+        PageRequest pageRequest = PageRequest.of(from / size, size);
         List<Event> events = eventRepository.findAll(
                 EventSpecifications.adminFilter(users, stateList, categories, start, end),
-                PageRequest.of(from / size, size)
+                pageRequest
         ).getContent();
+
         return enrichFullDtos(events);
     }
 
@@ -151,6 +158,7 @@ public class EventService {
                                                         Boolean onlyAvailable, String sort,
                                                         int from, int size,
                                                         String ip, String uri) {
+        // Сохраняем хит для поиска
         statsService.saveHit(uri, ip);
 
         LocalDateTime start = rangeStart != null ? LocalDateTime.parse(rangeStart, FORMATTER) : LocalDateTime.now();
@@ -161,20 +169,26 @@ public class EventService {
         }
 
         Sort sortOrder = "VIEWS".equals(sort)
-                ? Sort.by(Sort.Direction.DESC, "id")
+                ? Sort.by(Sort.Direction.DESC, "id") // Временная сортировка, потом пересортируем по views
                 : Sort.by(Sort.Direction.ASC, "eventDate");
 
+        PageRequest pageRequest = PageRequest.of(from / size, size, sortOrder);
         List<Event> events = eventRepository.findAll(
                 EventSpecifications.publicFilter(text, categories, paid, start, end),
-                PageRequest.of(from / size, size, sortOrder)
+                pageRequest
         ).getContent();
 
+        // Обогащаем данными
         List<EventDto.EventShortDto> result = enrichShortDtos(events);
 
+        // Фильтруем только доступные
         if (Boolean.TRUE.equals(onlyAvailable)) {
             result = result.stream()
                     .filter(e -> {
-                        Event ev = events.stream().filter(ev2 -> ev2.getId().equals(e.getId())).findFirst().orElse(null);
+                        Event ev = events.stream()
+                                .filter(ev2 -> ev2.getId().equals(e.getId()))
+                                .findFirst()
+                                .orElse(null);
                         if (ev == null) return false;
                         return ev.getParticipantLimit() == 0 || e.getConfirmedRequests() < ev.getParticipantLimit();
                     })
@@ -182,20 +196,35 @@ public class EventService {
         }
 
         if ("VIEWS".equals(sort)) {
-            result.sort(Comparator.comparingLong(e -> -Optional.ofNullable(e.getViews()).orElse(0L)));
+            result.sort((e1, e2) -> Long.compare(
+                    Optional.ofNullable(e2.getViews()).orElse(0L),
+                    Optional.ofNullable(e1.getViews()).orElse(0L)
+            ));
         }
 
         return result;
     }
 
     public EventDto.EventFullDto getPublicEvent(Long id, String ip, String uri) {
+        // 1. Сначала сохраняем хит в статистику (ВАЖНО: до получения события)
+        statsService.saveHit(uri, ip);
+
+        // 2. Затем получаем событие из БД
         Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
-        statsService.saveHit(uri, ip);
-        long views = statsService.getViews(uri);
+
+        // 3. Получаем количество подтвержденных запросов
         long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
+
+        // 4. Получаем количество просмотров (уже с учетом нового хита)
+        long views = statsService.getViews(uri);
+
+        log.debug("Event {}: confirmed={}, views={}", id, confirmed, views);
+
+        // 5. Возвращаем полное DTO с актуальными данными
         return toFullDto(event, confirmed, views);
     }
+
 
     private void applyUpdateFields(Event event, String annotation, Long categoryId, String description,
                                    LocalDateTime eventDate, EventDto.Location location,
@@ -221,28 +250,41 @@ public class EventService {
     }
 
     private List<EventDto.EventFullDto> enrichFullDtos(List<Event> events) {
-        if (events.isEmpty()) return List.of();
+        if (events.isEmpty()) return Collections.emptyList();
+
         List<Long> ids = events.stream().map(Event::getId).collect(Collectors.toList());
         Map<Long, Long> confirmedMap = getConfirmedMap(ids);
         Map<Long, Long> viewsMap = statsService.getViewsMap(ids);
+
         return events.stream()
-                .map(e -> toFullDto(e, confirmedMap.getOrDefault(e.getId(), 0L), viewsMap.getOrDefault(e.getId(), 0L)))
+                .map(e -> toFullDto(
+                        e,
+                        confirmedMap.getOrDefault(e.getId(), 0L),
+                        viewsMap.getOrDefault(e.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
     private List<EventDto.EventShortDto> enrichShortDtos(List<Event> events) {
-        if (events.isEmpty()) return List.of();
+        if (events.isEmpty()) return Collections.emptyList();
+
         List<Long> ids = events.stream().map(Event::getId).collect(Collectors.toList());
         Map<Long, Long> confirmedMap = getConfirmedMap(ids);
         Map<Long, Long> viewsMap = statsService.getViewsMap(ids);
+
         return events.stream()
-                .map(e -> toShortDto(e, confirmedMap.getOrDefault(e.getId(), 0L), viewsMap.getOrDefault(e.getId(), 0L)))
+                .map(e -> toShortDto(
+                        e,
+                        confirmedMap.getOrDefault(e.getId(), 0L),
+                        viewsMap.getOrDefault(e.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
     private Map<Long, Long> getConfirmedMap(List<Long> ids) {
         Map<Long, Long> map = new HashMap<>();
-        requestRepository.countConfirmedByEventIds(ids).forEach(row -> map.put((Long) row[0], (Long) row[1]));
+        List<Object[]> results = requestRepository.countConfirmedByEventIds(ids);
+        for (Object[] row : results) {
+            map.put((Long) row[0], (Long) row[1]);
+        }
         return map;
     }
 
@@ -250,12 +292,18 @@ public class EventService {
         return EventDto.EventFullDto.builder()
                 .id(e.getId())
                 .annotation(e.getAnnotation())
-                .category(CategoryDto.ResponseCategoryDto.builder().id(e.getCategory().getId()).name(e.getCategory().getName()).build())
+                .category(CategoryDto.ResponseCategoryDto.builder()
+                        .id(e.getCategory().getId())
+                        .name(e.getCategory().getName())
+                        .build())
                 .confirmedRequests(confirmed)
                 .createdOn(e.getCreatedOn() != null ? e.getCreatedOn().format(FORMATTER) : null)
                 .description(e.getDescription())
                 .eventDate(e.getEventDate().format(FORMATTER))
-                .initiator(UserDto.UserShortDto.builder().id(e.getInitiator().getId()).name(e.getInitiator().getName()).build())
+                .initiator(UserDto.UserShortDto.builder()
+                        .id(e.getInitiator().getId())
+                        .name(e.getInitiator().getName())
+                        .build())
                 .location(new EventDto.Location(e.getLat(), e.getLon()))
                 .paid(e.getPaid())
                 .participantLimit(e.getParticipantLimit())
@@ -271,10 +319,16 @@ public class EventService {
         return EventDto.EventShortDto.builder()
                 .id(e.getId())
                 .annotation(e.getAnnotation())
-                .category(CategoryDto.ResponseCategoryDto.builder().id(e.getCategory().getId()).name(e.getCategory().getName()).build())
+                .category(CategoryDto.ResponseCategoryDto.builder()
+                        .id(e.getCategory().getId())
+                        .name(e.getCategory().getName())
+                        .build())
                 .confirmedRequests(confirmed)
                 .eventDate(e.getEventDate().format(FORMATTER))
-                .initiator(UserDto.UserShortDto.builder().id(e.getInitiator().getId()).name(e.getInitiator().getName()).build())
+                .initiator(UserDto.UserShortDto.builder()
+                        .id(e.getInitiator().getId())
+                        .name(e.getInitiator().getName())
+                        .build())
                 .paid(e.getPaid())
                 .title(e.getTitle())
                 .views(views)
@@ -287,6 +341,7 @@ public class EventService {
     }
 
     public List<Event> findAllByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return Collections.emptyList();
         return eventRepository.findAllByIdIn(ids);
     }
 }
