@@ -12,14 +12,14 @@ public class PublicCategoryController {
     private final CategoryService categoryService;
 
     @GetMapping
-    public List<CategoryDto.ResponseCategoryDto> getCategories(
+    public List<CategoryResponseDto> getCategories(
             @RequestParam(defaultValue = "0") int from,
             @RequestParam(defaultValue = "10") int size) {
         return categoryService.getAll(from, size);
     }
 
     @GetMapping("/{catId}")
-    public CategoryDto.ResponseCategoryDto getCategory(@PathVariable Long catId) {
+    public CategoryResponseDto getCategory(@PathVariable Long catId) {
         return categoryService.getById(catId);
     }
 }

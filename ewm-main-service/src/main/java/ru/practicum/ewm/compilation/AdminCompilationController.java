@@ -13,7 +13,7 @@ public class AdminCompilationController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CompilationDto.ResponseCompilationDto saveCompilation(@Valid @RequestBody CompilationDto.NewCompilationDto dto) {
+    public CompilationResponseDto saveCompilation(@Valid @RequestBody NewCompilationDto dto) {
         return compilationService.create(dto);
     }
 
@@ -24,8 +24,8 @@ public class AdminCompilationController {
     }
 
     @PatchMapping("/{compId}")
-    public CompilationDto.ResponseCompilationDto updateCompilation(@PathVariable Long compId,
-                                                                   @Valid @RequestBody CompilationDto.UpdateCompilationRequest dto) {
+    public CompilationResponseDto updateCompilation(@PathVariable Long compId,
+                                                    @Valid @RequestBody UpdateCompilationRequest dto) {
         return compilationService.update(compId, dto);
     }
 }

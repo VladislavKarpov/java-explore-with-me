@@ -15,7 +15,7 @@ public class AdminUserController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public UserDto.ResponseUserDto registerUser(@Valid @RequestBody UserDto.NewUserRequest dto) {
+    public UserResponseDto registerUser(@Valid @RequestBody NewUserRequest dto) {
         return userService.create(dto);
     }
 
@@ -26,7 +26,7 @@ public class AdminUserController {
     }
 
     @GetMapping
-    public List<UserDto.ResponseUserDto> getUsers(
+    public List<UserResponseDto> getUsers(
             @RequestParam(required = false) List<Long> ids,
             @RequestParam(defaultValue = "0") int from,
             @RequestParam(defaultValue = "10") int size) {

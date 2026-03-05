@@ -12,7 +12,6 @@ import ru.practicum.ewm.user.User;
 import ru.practicum.ewm.user.UserService;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,20 +21,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RequestService {
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
     private final RequestRepository requestRepository;
     private final EventService eventService;
     private final UserService userService;
 
-    public List<RequestDto.ParticipationRequestDto> getUserRequests(Long userId) {
+    public List<ParticipationRequestDto> getUserRequests(Long userId) {
         userService.getEntityById(userId);
         return requestRepository.findAllByRequesterId(userId).stream()
                 .map(this::toDto).collect(Collectors.toList());
     }
 
     @Transactional
-    public RequestDto.ParticipationRequestDto addRequest(Long userId, Long eventId) {
+    public ParticipationRequestDto addRequest(Long userId, Long eventId) {
         User user = userService.getEntityById(userId);
         Event event = eventService.getEntityById(eventId);
 
@@ -61,21 +58,20 @@ public class RequestService {
                 .event(event)
                 .requester(user)
                 .status(status)
-                .created(LocalDateTime.now().truncatedTo(ChronoUnit.MICROS))
-                .build();
+                .created(LocalDateTime.now().truncatedTo(ChronoUnit.MICROS)).build();
 
         return toDto(requestRepository.save(req));
     }
 
     @Transactional
-    public RequestDto.ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
+    public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
         ParticipationRequest req = requestRepository.findByIdAndRequesterId(requestId, userId)
                 .orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " was not found"));
         req.setStatus(RequestStatus.CANCELED);
         return toDto(requestRepository.save(req));
     }
 
-    public List<RequestDto.ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
+    public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
         userService.getEntityById(userId);
         Event event = eventService.getEntityById(eventId);
         if (!event.getInitiator().getId().equals(userId)) {
@@ -86,8 +82,8 @@ public class RequestService {
     }
 
     @Transactional
-    public RequestDto.EventRequestStatusUpdateResult updateRequestStatuses(Long userId, Long eventId,
-                                                                           RequestDto.EventRequestStatusUpdateRequest dto) {
+    public EventRequestStatusUpdateResult updateRequestStatuses(Long userId, Long eventId,
+                                                                EventRequestStatusUpdateRequest dto) {
         userService.getEntityById(userId);
         Event event = eventService.getEntityById(eventId);
 
@@ -103,8 +99,8 @@ public class RequestService {
             }
         }
 
-        List<RequestDto.ParticipationRequestDto> confirmed = new ArrayList<>();
-        List<RequestDto.ParticipationRequestDto> rejected = new ArrayList<>();
+        List<ParticipationRequestDto> confirmed = new ArrayList<>();
+        List<ParticipationRequestDto> rejected = new ArrayList<>();
 
         if ("CONFIRMED".equals(dto.getStatus())) {
             long alreadyConfirmed = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
@@ -119,12 +115,12 @@ public class RequestService {
                 }
             }
             if (event.getParticipantLimit() > 0 && alreadyConfirmed >= event.getParticipantLimit()) {
-                List<ParticipationRequest> pendingRequests = requestRepository.findAllByEventId(eventId)
-                        .stream().filter(r -> r.getStatus() == RequestStatus.PENDING).collect(Collectors.toList());
-                for (ParticipationRequest r : pendingRequests) {
-                    r.setStatus(RequestStatus.REJECTED);
-                    rejected.add(toDto(requestRepository.save(r)));
-                }
+                requestRepository.findAllByEventId(eventId).stream()
+                        .filter(r -> r.getStatus() == RequestStatus.PENDING)
+                        .forEach(r -> {
+                            r.setStatus(RequestStatus.REJECTED);
+                            rejected.add(toDto(requestRepository.save(r)));
+                        });
             }
         } else {
             for (ParticipationRequest req : requests) {
@@ -133,17 +129,17 @@ public class RequestService {
             }
         }
 
-        return RequestDto.EventRequestStatusUpdateResult.builder()
-                .confirmedRequests(confirmed).rejectedRequests(rejected).build();
+        return EventRequestStatusUpdateResult.builder()
+                .confirmedRequests(confirmed)
+                .rejectedRequests(rejected).build();
     }
 
-    private RequestDto.ParticipationRequestDto toDto(ParticipationRequest req) {
-        return RequestDto.ParticipationRequestDto.builder()
+    private ParticipationRequestDto toDto(ParticipationRequest req) {
+        return ParticipationRequestDto.builder()
                 .id(req.getId())
                 .event(req.getEvent().getId())
                 .requester(req.getRequester().getId())
                 .status(req.getStatus().name())
-                .created(req.getCreated().truncatedTo(ChronoUnit.MICROS).toString())
-                .build();
+                .created(req.getCreated().truncatedTo(ChronoUnit.MICROS).toString()).build();
     }
 }

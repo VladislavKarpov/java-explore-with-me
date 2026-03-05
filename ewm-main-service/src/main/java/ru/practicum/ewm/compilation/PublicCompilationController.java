@@ -12,7 +12,7 @@ public class PublicCompilationController {
     private final CompilationService compilationService;
 
     @GetMapping
-    public List<CompilationDto.ResponseCompilationDto> getCompilations(
+    public List<CompilationResponseDto> getCompilations(
             @RequestParam(required = false) Boolean pinned,
             @RequestParam(defaultValue = "0") int from,
             @RequestParam(defaultValue = "10") int size) {
@@ -20,7 +20,7 @@ public class PublicCompilationController {
     }
 
     @GetMapping("/{compId}")
-    public CompilationDto.ResponseCompilationDto getCompilation(@PathVariable Long compId) {
+    public CompilationResponseDto getCompilation(@PathVariable Long compId) {
         return compilationService.getById(compId);
     }
 }

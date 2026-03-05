@@ -10,11 +10,10 @@ import java.util.List;
 @RequestMapping("/events")
 @RequiredArgsConstructor
 public class PublicEventController {
-
     private final EventService eventService;
 
     @GetMapping
-    public List<EventDto.EventShortDto> getEvents(
+    public List<EventShortDto> getEvents(
             @RequestParam(required = false) String text,
             @RequestParam(required = false) List<Long> categories,
             @RequestParam(required = false) Boolean paid,
@@ -24,48 +23,23 @@ public class PublicEventController {
             @RequestParam(defaultValue = "EVENT_DATE") String sort,
             @RequestParam(defaultValue = "0") Integer from,
             @RequestParam(defaultValue = "10") Integer size,
-            HttpServletRequest request
-    ) {
-
+            HttpServletRequest request) {
         String ip = extractIp(request);
-
-        return eventService.getPublicEvents(
-                text,
-                categories,
-                paid,
-                rangeStart,
-                rangeEnd,
-                onlyAvailable,
-                sort,
-                from,
-                size,
-                ip,
-                request.getRequestURI()
-        );
+        return eventService.getPublicEvents(text, categories, paid, rangeStart, rangeEnd,
+                onlyAvailable, sort, from, size, ip, request.getRequestURI());
     }
 
     @GetMapping("/{id}")
-    public EventDto.EventFullDto getEvent(
-            @PathVariable Long id,
-            HttpServletRequest request
-    ) {
-
+    public EventFullDto getEvent(@PathVariable Long id, HttpServletRequest request) {
         String ip = extractIp(request);
-
-        return eventService.getPublicEvent(
-                id,
-                ip,
-                request.getRequestURI()
-        );
+        return eventService.getPublicEvent(id, ip, request.getRequestURI());
     }
 
     private String extractIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
-
         if (ip != null && !ip.isBlank()) {
             return ip.split(",")[0].trim();
         }
-
         return request.getRemoteAddr();
     }
 }

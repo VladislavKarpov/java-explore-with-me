@@ -13,7 +13,7 @@ public class AdminEventController {
     private final EventService eventService;
 
     @GetMapping
-    public List<EventDto.EventFullDto> getEvents_2(
+    public List<EventFullDto> getEvents(
             @RequestParam(required = false) List<Long> users,
             @RequestParam(required = false) List<String> states,
             @RequestParam(required = false) List<Long> categories,
@@ -25,8 +25,8 @@ public class AdminEventController {
     }
 
     @PatchMapping("/{eventId}")
-    public EventDto.EventFullDto updateEvent_1(@PathVariable Long eventId,
-                                               @Valid @RequestBody EventDto.UpdateEventAdminRequest dto) {
+    public EventFullDto updateEvent(@PathVariable Long eventId,
+                                    @Valid @RequestBody UpdateEventAdminRequest dto) {
         return eventService.updateEventByAdmin(eventId, dto);
     }
 }

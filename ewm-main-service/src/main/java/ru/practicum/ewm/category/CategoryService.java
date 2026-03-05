@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.ewm.event.EventRepository;
 import ru.practicum.ewm.exception.ConflictException;
 import ru.practicum.ewm.exception.NotFoundException;
-import ru.practicum.ewm.event.EventRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,7 +19,7 @@ public class CategoryService {
     private final EventRepository eventRepository;
 
     @Transactional
-    public CategoryDto.ResponseCategoryDto create(CategoryDto.NewCategoryDto dto) {
+    public CategoryResponseDto create(CategoryNewDto dto) {
         if (categoryRepository.existsByName(dto.getName())) {
             throw new ConflictException("Category with name=" + dto.getName() + " already exists");
         }
@@ -38,7 +38,7 @@ public class CategoryService {
     }
 
     @Transactional
-    public CategoryDto.ResponseCategoryDto update(Long catId, CategoryDto.ResponseCategoryDto dto) {
+    public CategoryResponseDto update(Long catId, CategoryResponseDto dto) {
         Category category = categoryRepository.findById(catId)
                 .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));
         if (!category.getName().equals(dto.getName()) && categoryRepository.existsByName(dto.getName())) {
@@ -48,12 +48,12 @@ public class CategoryService {
         return toDto(categoryRepository.save(category));
     }
 
-    public List<CategoryDto.ResponseCategoryDto> getAll(int from, int size) {
+    public List<CategoryResponseDto> getAll(int from, int size) {
         return categoryRepository.findAll(PageRequest.of(from / size, size))
                 .stream().map(this::toDto).collect(Collectors.toList());
     }
 
-    public CategoryDto.ResponseCategoryDto getById(Long catId) {
+    public CategoryResponseDto getById(Long catId) {
         return toDto(categoryRepository.findById(catId)
                 .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found")));
     }
@@ -63,10 +63,9 @@ public class CategoryService {
                 .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));
     }
 
-    public CategoryDto.ResponseCategoryDto toDto(Category category) {
-        return CategoryDto.ResponseCategoryDto.builder()
+    public CategoryResponseDto toDto(Category category) {
+        return CategoryResponseDto.builder()
                 .id(category.getId())
-                .name(category.getName())
-                .build();
+                .name(category.getName()).build();
     }
 }

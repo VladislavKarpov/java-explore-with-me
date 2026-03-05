@@ -16,7 +16,7 @@ public class UserService {
     private final UserRepository userRepository;
 
     @Transactional
-    public UserDto.ResponseUserDto create(UserDto.NewUserRequest dto) {
+    public UserResponseDto create(NewUserRequest dto) {
         User user = User.builder().email(dto.getEmail()).name(dto.getName()).build();
         return toDto(userRepository.save(user));
     }
@@ -29,7 +29,7 @@ public class UserService {
         userRepository.deleteById(userId);
     }
 
-    public List<UserDto.ResponseUserDto> getUsers(List<Long> ids, int from, int size) {
+    public List<UserResponseDto> getUsers(List<Long> ids, int from, int size) {
         PageRequest page = PageRequest.of(from / size, size);
         if (ids == null || ids.isEmpty()) {
             return userRepository.findAll(page).stream().map(this::toDto).collect(Collectors.toList());
@@ -42,12 +42,16 @@ public class UserService {
                 .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
     }
 
-    public UserDto.ResponseUserDto toDto(User user) {
-        return UserDto.ResponseUserDto.builder()
-                .id(user.getId()).email(user.getEmail()).name(user.getName()).build();
+    public UserResponseDto toDto(User user) {
+        return UserResponseDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .name(user.getName()).build();
     }
 
-    public UserDto.UserShortDto toShortDto(User user) {
-        return UserDto.UserShortDto.builder().id(user.getId()).name(user.getName()).build();
+    public UserShortDto toShortDto(User user) {
+        return UserShortDto.builder()
+                .id(user.getId())
+                .name(user.getName()).build();
     }
 }
