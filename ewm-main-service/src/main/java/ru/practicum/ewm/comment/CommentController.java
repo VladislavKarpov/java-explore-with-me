@@ -20,11 +20,11 @@ public class CommentController {
         return commentService.getEventComments(eventId, from, size);
     }
 
-    @PostMapping("/users/{userId}/comments")
+    @PostMapping("/users/{userId}/comments/{eventId}")
     @ResponseStatus(HttpStatus.CREATED)
     public CommentDto.CommentResponseDto addComment(
             @PathVariable Long userId,
-            @RequestParam Long eventId,
+            @PathVariable Long eventId,
             @Valid @RequestBody CommentDto.NewCommentDto dto) {
         return commentService.addComment(userId, eventId, dto);
     }
