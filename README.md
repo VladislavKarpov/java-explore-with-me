@@ -10,7 +10,7 @@ Template repository for ExploreWithMe project.
 - **comments** — комментарии к событиям
 - **subscriptions** — подписки на пользователей
 - **rating_events** — лайки/дизлайки и рейтинг событий
-- **location_processing** — администрирование локаций
+- **location_processing** — администрирование
 - **moderation_enhancement** — расширенная модерация событий
 
 ## Pull Request
