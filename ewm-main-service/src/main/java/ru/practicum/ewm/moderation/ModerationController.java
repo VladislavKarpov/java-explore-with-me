@@ -15,10 +15,9 @@ public class ModerationController {
 
     @PostMapping("/users/{adminId}/events/{eventId}/notes")
     @ResponseStatus(HttpStatus.CREATED)
-    public ModerationDto.ModerationNoteResponse addNote(
-            @PathVariable Long adminId,
-            @PathVariable Long eventId,
-            @Valid @RequestBody ModerationDto.ModerationNoteRequest dto) {
+    public ModerationDto.ModerationNoteResponse addNote(@PathVariable Long adminId,
+                                                        @PathVariable Long eventId,
+                                                        @Valid @RequestBody ModerationDto.ModerationNoteRequest dto) {
         return moderationService.addNote(adminId, eventId, dto);
     }
 

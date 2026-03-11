@@ -15,17 +15,18 @@ public class LocationService {
     private final LocationRepository locationRepository;
 
     @Transactional
-    public LocationDto.LocationResponseDto create(LocationDto.NewLocationDto dto) {
+    public LocationResponseDto create(NewLocationDto dto) {
         Location location = Location.builder()
                 .name(dto.getName())
                 .lat(dto.getLat())
                 .lon(dto.getLon())
-                .radius(dto.getRadius()).build();
+                .radius(dto.getRadius())
+                .build();
         return toDto(locationRepository.save(location));
     }
 
     @Transactional
-    public LocationDto.LocationResponseDto update(Long id, LocationDto.NewLocationDto dto) {
+    public LocationResponseDto update(Long id, NewLocationDto dto) {
         Location location = locationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Location with id=" + id + " was not found"));
         if (dto.getName() != null) location.setName(dto.getName());
@@ -43,26 +44,30 @@ public class LocationService {
         locationRepository.deleteById(id);
     }
 
-    public List<LocationDto.LocationResponseDto> getAll() {
-        return locationRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+    public List<LocationResponseDto> getAll() {
+        return locationRepository.findAll().stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 
-    public LocationDto.LocationResponseDto getById(Long id) {
+    public LocationResponseDto getById(Long id) {
         return toDto(locationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Location with id=" + id + " was not found")));
     }
 
-    public List<LocationDto.LocationResponseDto> findByCoordinates(Float lat, Float lon) {
+    public List<LocationResponseDto> findByCoordinates(Float lat, Float lon) {
         return locationRepository.findByCoordinates(lat, lon).stream()
-                .map(this::toDto).collect(Collectors.toList());
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 
-    private LocationDto.LocationResponseDto toDto(Location l) {
-        return LocationDto.LocationResponseDto.builder()
+    private LocationResponseDto toDto(Location l) {
+        return LocationResponseDto.builder()
                 .id(l.getId())
                 .name(l.getName())
                 .lat(l.getLat())
                 .lon(l.getLon())
-                .radius(l.getRadius()).build();
+                .radius(l.getRadius())
+                .build();
     }
 }

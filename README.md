@@ -14,3 +14,5 @@ Template repository for ExploreWithMe project.
 - **moderation_enhancement** — расширенная модерация событий
 
 ## Pull Request
+
+https://github.com/VladislavKarpov/java-explore-with-me/pull/5
