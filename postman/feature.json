@@ -1,0 +1,530 @@
+{
+  "info": {
+    "name": "EWM Feature Tests",
+    "_postman_id": "ewm-feature-collection",
+    "description": "Tests for additional features",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8080"},
+    {"key": "userId1", "value": "1"},
+    {"key": "userId2", "value": "2"},
+    {"key": "eventId", "value": "1"},
+    {"key": "commentId", "value": "1"},
+    {"key": "locationId", "value": "1"},
+    {"key": "noteId", "value": "1"},
+    {"key": "categoryId", "value": "1"}
+  ],
+  "item": [
+    {
+      "name": "Setup",
+      "item": [
+        {
+          "name": "Create User 1",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('userId1', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/users",
+            "body": {"mode": "raw", "raw": "{\"email\": \"user1feature@email.com\", \"name\": \"User One\"}"}
+          }
+        },
+        {
+          "name": "Create User 2",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('userId2', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/users",
+            "body": {"mode": "raw", "raw": "{\"email\": \"user2feature@email.com\", \"name\": \"User Two\"}"}
+          }
+        },
+        {
+          "name": "Create Category",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('categoryId', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/categories",
+            "body": {"mode": "raw", "raw": "{\"name\": \"FeatureCategory\"}"}
+          }
+        },
+        {
+          "name": "Create Event",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('eventId', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/users/{{userId1}}/events",
+            "body": {"mode": "raw", "raw": "{\"annotation\": \"Test event annotation for feature tests\", \"category\": {{categoryId}}, \"description\": \"Test event description for feature tests minimum length\", \"eventDate\": \"2030-01-01 12:00:00\", \"location\": {\"lat\": 55.75, \"lon\": 37.61}, \"paid\": false, \"participantLimit\": 10, \"requestModeration\": false, \"title\": \"Test Event Feature\"}"}
+          }
+        },
+        {
+          "name": "Publish Event",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Event is published', () => pm.expect(pm.response.json().state).to.equal('PUBLISHED'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/events/{{eventId}}",
+            "body": {"mode": "raw", "raw": "{\"stateAction\": \"PUBLISH_EVENT\"}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comments",
+      "item": [
+        {
+          "name": "Add Comment",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.test('Comment has text', () => pm.expect(pm.response.json().text).to.exist);",
+            "pm.collectionVariables.set('commentId', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/users/{{userId2}}/comments/{{eventId}}",
+            "body": {"mode": "raw", "raw": "{\"text\": \"This is a test comment for the event\"}"}
+          }
+        },
+        {
+          "name": "Add Comment - Blank text returns 400",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/users/{{userId2}}/comments/{{eventId}}",
+            "body": {"mode": "raw", "raw": "{\"text\": \"\"}"}
+          }
+        },
+        {
+          "name": "Get Event Comments",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/events/{{eventId}}/comments"
+          }
+        },
+        {
+          "name": "Get User Comments",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{userId2}}/comments"
+          }
+        },
+        {
+          "name": "Update Comment",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Text updated', () => pm.expect(pm.response.json().text).to.equal('Updated comment text'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/users/{{userId2}}/comments/{{commentId}}",
+            "body": {"mode": "raw", "raw": "{\"text\": \"Updated comment text\"}"}
+          }
+        },
+        {
+          "name": "Update Comment - Wrong user returns 404",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/users/{{userId1}}/comments/{{commentId}}",
+            "body": {"mode": "raw", "raw": "{\"text\": \"Should not update\"}"}
+          }
+        },
+        {
+          "name": "Delete Comment by Admin",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/admin/comments/{{commentId}}"
+          }
+        },
+        {
+          "name": "Add Comment for Delete test",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('commentId', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/users/{{userId2}}/comments/{{eventId}}",
+            "body": {"mode": "raw", "raw": "{\"text\": \"Comment to be deleted by user\"}"}
+          }
+        },
+        {
+          "name": "Delete Comment by User",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/{{userId2}}/comments/{{commentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscriptions",
+      "item": [
+        {
+          "name": "Subscribe",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/{{userId2}}/subscriptions/{{userId1}}"
+          }
+        },
+        {
+          "name": "Subscribe to yourself returns 409",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/{{userId1}}/subscriptions/{{userId1}}"
+          }
+        },
+        {
+          "name": "Subscribe again returns 409",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users/{{userId2}}/subscriptions/{{userId1}}"
+          }
+        },
+        {
+          "name": "Get Followings",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{userId2}}/subscriptions/followings"
+          }
+        },
+        {
+          "name": "Get Followers",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{userId1}}/subscriptions/followers"
+          }
+        },
+        {
+          "name": "Get Following Events",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{userId2}}/subscriptions/events"
+          }
+        },
+        {
+          "name": "Unsubscribe",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/{{userId2}}/subscriptions/{{userId1}}"
+          }
+        },
+        {
+          "name": "Unsubscribe again returns 404",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/{{userId2}}/subscriptions/{{userId1}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rating Events",
+      "item": [
+        {
+          "name": "Add Like",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.test('Likes is 1', () => pm.expect(pm.response.json().likes).to.equal(1));",
+            "pm.test('Rating is 1', () => pm.expect(pm.response.json().rating).to.equal(1));"
+          ]}}],
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/users/{{userId2}}/events/{{eventId}}/like"
+          }
+        },
+        {
+          "name": "Add Like - Own event returns 409",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+          ]}}],
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/users/{{userId1}}/events/{{eventId}}/like"
+          }
+        },
+        {
+          "name": "Get Rating",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has likes field', () => pm.expect(pm.response.json().likes).to.not.be.undefined);",
+            "pm.test('Has dislikes field', () => pm.expect(pm.response.json().dislikes).to.not.be.undefined);",
+            "pm.test('Has rating field', () => pm.expect(pm.response.json().rating).to.not.be.undefined);"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/events/{{eventId}}/rating"
+          }
+        },
+        {
+          "name": "Add Dislike - changes like to dislike",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.test('Dislikes is 1', () => pm.expect(pm.response.json().dislikes).to.equal(1));"
+          ]}}],
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/users/{{userId2}}/events/{{eventId}}/dislike"
+          }
+        },
+        {
+          "name": "Remove Rating",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/{{userId2}}/events/{{eventId}}/rating"
+          }
+        },
+        {
+          "name": "Remove Rating - not found returns 404",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/{{userId2}}/events/{{eventId}}/rating"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Location Processing",
+      "item": [
+        {
+          "name": "Create Location",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.test('Has id', () => pm.expect(pm.response.json().id).to.exist);",
+            "pm.collectionVariables.set('locationId', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/locations",
+            "body": {"mode": "raw", "raw": "{\"name\": \"Moscow Center\", \"lat\": 55.75, \"lon\": 37.61, \"radius\": 5.0}"}
+          }
+        },
+        {
+          "name": "Create Location - Missing name returns 400",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/locations",
+            "body": {"mode": "raw", "raw": "{\"lat\": 55.75, \"lon\": 37.61, \"radius\": 5.0}"}
+          }
+        },
+        {
+          "name": "Get All Locations",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/locations"
+          }
+        },
+        {
+          "name": "Get Location by Id",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has name', () => pm.expect(pm.response.json().name).to.equal('Moscow Center'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/locations/{{locationId}}"
+          }
+        },
+        {
+          "name": "Get Location by Id - Not found returns 404",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/locations/999999"
+          }
+        },
+        {
+          "name": "Update Location",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Name updated', () => pm.expect(pm.response.json().name).to.equal('Updated Location'));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/locations/{{locationId}}",
+            "body": {"mode": "raw", "raw": "{\"name\": \"Updated Location\", \"lat\": 55.75, \"lon\": 37.61, \"radius\": 10.0}"}
+          }
+        },
+        {
+          "name": "Find Locations by Coordinates",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/locations?lat=55.75&lon=37.61"
+          }
+        },
+        {
+          "name": "Delete Location",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/admin/locations/{{locationId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Moderation Enhancement",
+      "item": [
+        {
+          "name": "Add Moderation Note",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+            "pm.test('Has note', () => pm.expect(pm.response.json().note).to.exist);",
+            "pm.collectionVariables.set('noteId', pm.response.json().id);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/users/{{userId1}}/events/{{eventId}}/notes",
+            "body": {"mode": "raw", "raw": "{\"note\": \"This event needs additional review for content compliance\"}"}
+          }
+        },
+        {
+          "name": "Add Moderation Note - Blank note returns 400",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/admin/users/{{userId1}}/events/{{eventId}}/notes",
+            "body": {"mode": "raw", "raw": "{\"note\": \"\"}"}
+          }
+        },
+        {
+          "name": "Get Event Notes",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+            "pm.test('Response is array', () => pm.expect(pm.response.json()).to.be.an('array'));",
+            "pm.test('Has 1 note', () => pm.expect(pm.response.json().length).to.equal(1));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/events/{{eventId}}/notes"
+          }
+        },
+        {
+          "name": "Get Notes - Event not found returns 404",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/events/999999/notes"
+          }
+        },
+        {
+          "name": "Delete Moderation Note",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/admin/notes/{{noteId}}"
+          }
+        },
+        {
+          "name": "Delete Note - Not found returns 404",
+          "event": [{"listen": "test", "script": {"exec": [
+            "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+          ]}}],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/admin/notes/999999"
+          }
+        }
+      ]
+    }
+  ]
+}
